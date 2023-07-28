@@ -2,6 +2,7 @@
 .vscode/
 clip-vit-large-patch14/
 
+unet_onnx/
 training/
 lightning_logs/
 image_log/

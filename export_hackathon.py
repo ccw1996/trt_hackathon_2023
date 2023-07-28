@@ -6,7 +6,7 @@ model = hackathon()
 model.initialize()
 
 
-for i in range(1):
+for i in range(3):
     path = "/home/player/pictures_croped/bird_"+ str(i) + ".jpg"
     img = cv2.imread(path)
     start = datetime.datetime.now().timestamp()
@@ -25,5 +25,5 @@ for i in range(1):
             100, 
             200)
     
-    cv2.imwrite(f'out_imgs/bird_{i}.jpg', new_img[0])
+    cv2.imwrite(f'out_imgs/bird_CTRL&UNET&DECODER_{i}.jpg', new_img[0])
     

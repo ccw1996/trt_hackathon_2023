@@ -1,6 +1,6 @@
 from share import *
 import config
-
+import time
 import cv2
 import einops
 import gradio as gr
@@ -17,6 +17,8 @@ from cldm.model import create_model, load_state_dict
 from cldm.ddim_hacked import DDIMSampler
 from ldm.util import log_txt_as_img, exists, instantiate_from_config
 
+from export_onnx import export_hackathon_onnx
+from export_engine import export_engine
 
 class hackathon():
 
@@ -26,65 +28,111 @@ class hackathon():
         self.model.load_state_dict(load_state_dict('./models/control_sd15_canny.pth', location='cuda'))
         self.model = self.model.cuda()
         self.ddim_sampler = DDIMSampler(self.model)
+    
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
 
+        if not os.path.isfile("./onnx_model/clip.onnx") or \
+           not os.path.isfile("./onnx_model/controlnet.onnx") or \
+           not os.path.isfile("./unet_onnx/unet.onnx") or \
+           not os.path.isfile("./onnx_model/vae_decoder.onnx"):               
+            export_hackathon_onnx(self.model)
+            
+        if not os.path.isfile("./engine_model/clip.engine") or \
+           not os.path.isfile("./engine_model/controlnet.engine") or \
+           not os.path.isfile("./engine_model/unet.engine") or \
+           not os.path.isfile("./engine_model/vae_decoder.engine"):   
+            export_engine()
+
         H = 256
         W = 384
-
-        control_model = self.model.control_model
-        if not os.path.isfile("sd_control_fp16.engine"):
-            x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
-            h_in = torch.randn(1, 3, H, W, dtype=torch.float32).to("cuda")
-            t_in = torch.zeros(1, dtype=torch.int64).to("cuda")
-            c_in = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
-
-            controls = control_model(x=x_in, hint=h_in, timesteps=t_in, context=c_in)
-
-            output_names = []
-            for i in range(13):
-                output_names.append("out_"+ str(i))
-
-            dynamic_table = {'x_in' : {0 : 'bs', 2 : 'H', 3 : 'W'}, 
-                                'h_in' : {0 : 'bs', 2 : '8H', 3 : '8W'}, 
-                                't_in' : {0 : 'bs'},
-                                'c_in' : {0 : 'bs'}}
+        
+        self.model.clip_context = None
+        self.model.control_context = None
+        self.model.unet_context = None
+        self.model.decoder_context = None
+        
+    
+        # -------------------------------
+        # load clip engine
+        # -------------------------------
             
-            for i in range(13):
-                dynamic_table[output_names[i]] = {0 : "bs"}
-            print("init 2")
-
-            torch.onnx.export(control_model,               
-                                (x_in, h_in, t_in, c_in),  
-                                "./sd_control_test.onnx",   
-                                export_params=True,
-                                opset_version=16,
-                                do_constant_folding=True,
-                                keep_initializers_as_inputs=True,
-                                input_names = ['x_in', "h_in", "t_in", "c_in"], 
-                                output_names = output_names, 
-                                dynamic_axes = dynamic_table)
+        # with open("./engine_model/clip.engine", 'rb') as f:
+        #     engine_str = f.read()
+        #     clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+        #     clip_context = clip_engine.create_execution_context()
             
-            os.system("trtexec --onnx=sd_control_test.onnx --saveEngine=sd_control_fp16.engine --fp16 --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768")
-
-        with open("./sd_control_fp16.engine", 'rb') as f:
+        #     clip_context.set_binding_shape(0, (1, 77))
+        #     self.model.clip_context = clip_context
+            
+        # -------------------------------
+        # load controlnet engine
+        # -------------------------------
+        with open("./engine_model/controlnet.engine", 'rb') as f:
             engine_str = f.read()
+            control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+            control_context = control_engine.create_execution_context()
 
-        control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-        control_context = control_engine.create_execution_context()
-
-        control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-        control_context.set_binding_shape(1, (1, 3, H, W))
-        control_context.set_binding_shape(2, (1,))
-        control_context.set_binding_shape(3, (1, 77, 768))
-        self.model.control_context = control_context
-
-        print("finished")
-
-
+            control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
+            control_context.set_binding_shape(1, (1, 3, H, W))
+            control_context.set_binding_shape(2, (1,))
+            control_context.set_binding_shape(3, (1, 77, 768))
+            self.model.control_context = control_context
+        
+        # -------------------------------
+        # load unet engine
+        # -------------------------------
+        
+        with open("./engine_model/unet.engine", 'rb') as f:
+            engine_str = f.read()
+            unet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+            unet_context = unet_engine.create_execution_context()
+            
+            unet_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
+            unet_context.set_binding_shape(1, (1,))
+            unet_context.set_binding_shape(2, (1, 77, 768))
+            
+            control_shape = []
+            control_shape.append([1, 320, 32, 48])
+            control_shape.append([1, 320, 32, 48])
+            control_shape.append([1, 320, 32, 48])
+            control_shape.append([1, 320, 16, 24])
+            control_shape.append([1, 640, 16, 24])
+            control_shape.append([1, 640, 16, 24])
+            control_shape.append([1, 640, 8, 12])
+            control_shape.append([1, 1280, 8, 12])
+            control_shape.append([1, 1280, 8, 12])
+            control_shape.append([1, 1280, 4, 6])
+            control_shape.append([1, 1280, 4, 6])
+            control_shape.append([1, 1280, 4, 6])
+            control_shape.append([1, 1280, 4, 6])
+            
+            for i in range(len(control_shape)):
+                unet_context.set_binding_shape(3 + i, tuple(control_shape[i]))
+            
+            self.model.unet_context = unet_context
+            
+        # -------------------------------
+        # load decoder engine
+        # -------------------------------
+        
+        with open("./engine_model/vae_decoder.engine", 'rb') as f:
+            engine_str = f.read()
+            decoder_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+            decoder_context = decoder_engine.create_execution_context()
+            
+            decoder_context.set_binding_shape(0, (1, 4, 32, 48))
+            self.model.decoder_context = decoder_context
+            
+            
+            
+            
+            
 
     def process(self, input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, low_threshold, high_threshold):
         with torch.no_grad():
+            start = time.time_ns() // 1000 
+            
             img = resize_image(HWC3(input_image), image_resolution)
             H, W, C = img.shape
 
@@ -102,9 +150,14 @@ class hackathon():
             if config.save_memory:
                 self.model.low_vram_shift(is_diffusing=False)
 
-            cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples)]}
-            un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples)]}  # use clip net
+            preprocess = time.time_ns() // 1000
+
+
+            cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples, self.model.clip_context)]}
+            un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples, self.model.clip_context)]}  # use clip net
             shape = (4, H // 8, W // 8)
+            
+            clip = time.time_ns() // 1000
 
             if config.save_memory:
                 self.model.low_vram_shift(is_diffusing=True)
@@ -114,13 +167,26 @@ class hackathon():
                                                         shape, cond, verbose=False, eta=eta,
                                                         unconditional_guidance_scale=scale,
                                                         unconditional_conditioning=un_cond)
+            ctrlnet = time.time_ns() // 1000
 
             if config.save_memory:
                 self.model.low_vram_shift(is_diffusing=False)
 
-            x_samples = self.model.decode_first_stage(samples)
+            x_samples = self.model.decode_first_stage(samples, decoder_context=self.model.decoder_context)
+            decode = time.time_ns() // 1000
+            
             x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy().clip(0, 255).astype(np.uint8)
 
             results = [x_samples[i] for i in range(num_samples)]
+            end = time.time_ns() // 1000
+            print("| Module      | Cost time|")
+            print("|---          |---       |")
+            print("| Preprocess  | {:8.3f} | \ ".format(1.0 * (preprocess - start) / 1000))
+            print("| Clip        | {:8.3f} | \ ".format(1.0 * (clip - preprocess) / 1000))
+            print("| Ctrl & Unet | {:8.3f} | \ ".format(1.0 * (ctrlnet - clip) / 1000))
+            print("| Decode      | {:8.3f} | \ ".format(1.0 * (decode - ctrlnet) / 1000))
+            print("| Postprocess | {:8.3f} | \ ".format(1.0 * (end - decode) / 1000))
+            print("| Total       | {:8.3f} | \ ".format(1.0 * (end - start) / 1000))            
+            
         return results
     

@@ -114,12 +114,24 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         for param in self.parameters():
             param.requires_grad = False
 
-    def forward(self, text):
+    def forward(self, text, clip_context=None):
         batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
         tokens = batch_encoding["input_ids"].to(self.device)
-        outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")  # use clip
-        if self.layer == "last":
+        if clip_context == None:
+            outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")  # use clip
+        else :
+            text_emb = torch.zeros(1, 77, 768, dtype=torch.float32).to("cuda")
+            other_out = torch.zeros(1, 768, dtype=torch.float32).to("cuda")
+            clip_buffer = []
+            clip_buffer.append(tokens.reshape(-1).data_ptr())
+            clip_buffer.append(text_emb.reshape(-1).data_ptr())
+            clip_buffer.append(other_out.reshape(-1).data_ptr())
+            clip_context.execute_v2(clip_buffer)  # clip engine
+            
+            return text_emb
+
+        if self.layer == "last": 
             z = outputs.last_hidden_state  # this
         elif self.layer == "pooled":
             z = outputs.pooler_output[:, None, :]
@@ -127,8 +139,8 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             z = outputs.hidden_states[self.layer_idx]
         return z
 
-    def encode(self, text):
-        return self(text)
+    def encode(self, text, clip_context=None):
+        return self(text, clip_context)
 
 
 class FrozenOpenCLIPEmbedder(AbstractEncoder):

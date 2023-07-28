@@ -5,7 +5,7 @@ import tensorrt as trt
 from typing import Dict, Sequence, Union
 
 
-def from_onnx(onnx_model: Union[str, onnx.ModelProto],
+def from_onnx(onnx_model: str,
               file_name: str,
               input_shapes: Dict[str, Sequence[int]],
               max_workspace_size: int = 0,
@@ -24,9 +24,14 @@ def from_onnx(onnx_model: Union[str, onnx.ModelProto],
     parser = trt.OnnxParser(network, logger)
 
     if isinstance(onnx_model, str):
-        onnx_model = onnx.load(onnx_model)
+        onnx_graph = onnx.load(onnx_model)
 
-    if not parser.parse(onnx_model.SerializeToString()):
+
+    # if onnx_graph.ByteSize() > 2147483648:  # for unet
+    #     onnx.shape_inference.infer_shapes_path(onnx_model)
+    #     onnx_graph = onnx.load(onnx_model)
+
+    if not parser.parse(onnx_graph.SerializeToString()):
         error_msgs = ''
         for error in range(parser.num_errors):
             error_msgs += f'{parser.get_error(error)}\n'
@@ -85,10 +90,10 @@ def export_engine():
     decoder_input_shape = dict(latent = dict(min_shape = [1, 4, latent_height, latent_width],
                                              opt_shape = [1, 4, latent_height, latent_width],
                                              max_shape = [1, 4, latent_height, latent_width]))
-    from_onnx('./onnx_model/vae_decoder.onnx',
-              './engine_model/vae_decoder.engine',
-              decoder_input_shape,
-              1 << 32)
+    # from_onnx('./onnx_model/vae_decoder.onnx',
+    #           './engine_model/vae_decoder.engine',
+    #           decoder_input_shape,
+    #           1 << 32)
     print("----- Export vae_decoder.engine : Done! ----")
     
     
@@ -108,37 +113,27 @@ def export_engine():
                                               opt_shape = [1, 77, 768],
                                               max_shape = [1, 77, 768]))
     
-    from_onnx('./onnx_model/controlnet.onnx',
-              './engine_model/controlnet.engine',
-              controlnet_input_shape,
-              1 << 32)
+    # from_onnx('./onnx_model/controlnet.onnx',
+    #           './engine_model/controlnet.engine',
+    #           controlnet_input_shape,
+    #           1 << 32)
     print("----- Export controlnet.engine : Done! -----")
     
     
-    # ---------------------------------
-    # Export unet_first_half.engine
-    # ---------------------------------
-    unet_fh_input_shape = dict(x_in = dict(min_shape = [1, 4, latent_height, latent_width],
-                                           opt_shape = [1, 4, latent_height, latent_width],
-                                           max_shape = [1, 4, latent_height, latent_width]),
-                               t_in = dict(min_shape = [1],
-                                           opt_shape = [1],
-                                           max_shape = [1]),
-                               c_in = dict(min_shape = [1, 77, 768],
-                                           opt_shape = [1, 77, 768],
-                                           max_shape = [1, 77, 768]))
- 
-    from_onnx('./unet_two_half/unet_first_half.onnx',
-              './engine_model/unet_first_half.engine',
-              unet_fh_input_shape,
-              3 << 32)
-    
-    print("--------- Export unet_first_half.engine : Done! ---------")
     
     # ---------------------------------
-    # Export unet_second_half.engine
+    # Export unet.engine
     # ---------------------------------
     
+    unet_input_shape = dict(x_in = dict(min_shape = [1, 4, latent_height, latent_width],
+                                        opt_shape = [1, 4, latent_height, latent_width],
+                                        max_shape = [1, 4, latent_height, latent_width]),
+                            t_in = dict(min_shape = [1],
+                                        opt_shape = [1],
+                                        max_shape = [1]),
+                            c_in = dict(min_shape = [1, 77, 768],
+                                        opt_shape = [1, 77, 768],
+                                        max_shape = [1, 77, 768]))
     control_shape = []
     control_shape.append([1, 320, 32, 48])
     control_shape.append([1, 320, 32, 48])
@@ -154,46 +149,108 @@ def export_engine():
     control_shape.append([1, 1280, 4, 6])
     control_shape.append([1, 1280, 4, 6])
     
-    hs_shape = []
-    hs_shape.append([1, 320, 32, 48])
-    hs_shape.append([1, 320, 32, 48])
-    hs_shape.append([1, 320, 32, 48])
-    hs_shape.append([1, 320, 16, 24])
-    hs_shape.append([1, 640, 16, 24])
-    hs_shape.append([1, 640, 16, 24])
-    hs_shape.append([1, 640, 8, 12])
-    hs_shape.append([1, 1280, 8, 12])
-    hs_shape.append([1, 1280, 8, 12])
-    hs_shape.append([1, 1280, 4, 6])
-    hs_shape.append([1, 1280, 4, 6])
-    hs_shape.append([1, 1280, 4, 6])
-    
-    unet_sh_input_shape = dict(h = dict(min_shape = [1, 1280, 4, 6],
-                                        opt_shape = [1, 1280, 4, 6],
-                                        max_shape = [1, 1280, 4, 6]))
-
-    for i in range(len(hs_shape)):
-        unet_sh_input_shape[f'hs_{i}'] = dict(min_shape = hs_shape[i],
-                                              opt_shape = hs_shape[i],
-                                              max_shape = hs_shape[i])
-    unet_sh_input_shape['emb'] = dict(min_shape = [1, 1280],
-                                      opt_shape = [1, 1280],
-                                      max_shape = [1, 1280])
-    unet_sh_input_shape['c_in'] = dict(min_shape = [1, 77, 768],
-                                       opt_shape = [1, 77, 768],
-                                       max_shape = [1, 77, 768])
-    
     for i in range(len(control_shape)):
-        unet_sh_input_shape[f'control_{i}'] = dict(min_shape = control_shape[i],
-                                                   opt_shape = control_shape[i],
-                                                   max_shape = control_shape[i])
+        unet_input_shape[f'control_{i}'] = dict(min_shape = control_shape[i],
+                                                opt_shape = control_shape[i],
+                                                max_shape = control_shape[i])
+        
+        
+    # from_onnx('./unet_onnx/unet.onnx',
+    #           './engine_model/unet.engine',
+    #           unet_input_shape,
+    #           1 << 32)
+        
+        
+    export_unet_shell = 'trtexec --onnx=./unet_onnx/unet.onnx --saveEngine=./engine_model/unet.engine --fp16 --optShapes=x_in:1x4x32x48,t_in:1,c_in:1x77x768'
+    for i in range(len(control_shape)):
+        export_unet_shell += f',control_{i}:{control_shape[i][0]}x{control_shape[i][1]}x{control_shape[i][2]}x{control_shape[i][3]}'
+    
+    print(export_unet_shell)
+    
+    # os.system(export_unet_shell)
+     
+     
+     
+     
+    # # ---------------------------------
+    # # Export unet_first_half.engine
+    # # ---------------------------------
+    # unet_fh_input_shape = dict(x_in = dict(min_shape = [1, 4, latent_height, latent_width],
+    #                                        opt_shape = [1, 4, latent_height, latent_width],
+    #                                        max_shape = [1, 4, latent_height, latent_width]),
+    #                            t_in = dict(min_shape = [1],
+    #                                        opt_shape = [1],
+    #                                        max_shape = [1]),
+    #                            c_in = dict(min_shape = [1, 77, 768],
+    #                                        opt_shape = [1, 77, 768],
+    #                                        max_shape = [1, 77, 768]))
+ 
+    # from_onnx('./onnx_model/unet_first_half.onnx',
+    #           './engine_model/unet_first_half.engine',
+    #           unet_fh_input_shape,
+    #           1 << 32)
+    
+    # print("--------- Export unet_first_half.engine : Done! ---------")
+    
+    # # ---------------------------------
+    # # Export unet_second_half.engine
+    # # ---------------------------------
+    
+    # control_shape = []
+    # control_shape.append([1, 320, 32, 48])
+    # control_shape.append([1, 320, 32, 48])
+    # control_shape.append([1, 320, 32, 48])
+    # control_shape.append([1, 320, 16, 24])
+    # control_shape.append([1, 640, 16, 24])
+    # control_shape.append([1, 640, 16, 24])
+    # control_shape.append([1, 640, 8, 12])
+    # control_shape.append([1, 1280, 8, 12])
+    # control_shape.append([1, 1280, 8, 12])
+    # control_shape.append([1, 1280, 4, 6])
+    # control_shape.append([1, 1280, 4, 6])
+    # control_shape.append([1, 1280, 4, 6])
+    # control_shape.append([1, 1280, 4, 6])
+    
+    # hs_shape = []
+    # hs_shape.append([1, 320, 32, 48])
+    # hs_shape.append([1, 320, 32, 48])
+    # hs_shape.append([1, 320, 32, 48])
+    # hs_shape.append([1, 320, 16, 24])
+    # hs_shape.append([1, 640, 16, 24])
+    # hs_shape.append([1, 640, 16, 24])
+    # hs_shape.append([1, 640, 8, 12])
+    # hs_shape.append([1, 1280, 8, 12])
+    # hs_shape.append([1, 1280, 8, 12])
+    # hs_shape.append([1, 1280, 4, 6])
+    # hs_shape.append([1, 1280, 4, 6])
+    # hs_shape.append([1, 1280, 4, 6])
+    
+    # unet_sh_input_shape = dict(h = dict(min_shape = [1, 1280, 4, 6],
+    #                                     opt_shape = [1, 1280, 4, 6],
+    #                                     max_shape = [1, 1280, 4, 6]))
+
+    # for i in range(len(hs_shape)):
+    #     unet_sh_input_shape[f'hs_{i}'] = dict(min_shape = hs_shape[i],
+    #                                           opt_shape = hs_shape[i],
+    #                                           max_shape = hs_shape[i])
+    # unet_sh_input_shape['emb'] = dict(min_shape = [1, 1280],
+    #                                   opt_shape = [1, 1280],
+    #                                   max_shape = [1, 1280])
+    # unet_sh_input_shape['c_in'] = dict(min_shape = [1, 77, 768],
+    #                                    opt_shape = [1, 77, 768],
+    #                                    max_shape = [1, 77, 768])
+    
+    # for i in range(len(control_shape)):
+    #     unet_sh_input_shape[f'control_{i}'] = dict(min_shape = control_shape[i],
+    #                                                opt_shape = control_shape[i],
+    #                                                max_shape = control_shape[i])
         
     
-    from_onnx('./unet_two_half/unet_second_half.onnx',
-              './engine_model/unet_second_half.engine',
-              unet_sh_input_shape,
-              3 << 32)
-    print("--------- Export unet_second_half.engine : Done! ---------")
+    # # from_onnx('./onnx_model/unet_second_half.onnx',
+    # #           './engine_model/unet_second_half.engine',
+    # #           unet_sh_input_shape,
+    # #           1 << 32)
+    # print("--------- Export unet_second_half.engine : Done! ---------")
         
 
 if __name__ == "__main__":

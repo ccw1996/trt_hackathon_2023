@@ -628,7 +628,7 @@ class LatentDiffusion(DDPM):
                 print(f"Training {self.__class__.__name__} as an unconditional model.")
                 self.cond_stage_model = None
                 # self.be_unconditional = True
-            else:
+            else:  # this
                 model = instantiate_from_config(config)
                 self.cond_stage_model = model.eval()
                 self.cond_stage_model.train = disabled_train
@@ -661,10 +661,10 @@ class LatentDiffusion(DDPM):
             raise NotImplementedError(f"encoder_posterior of type '{type(encoder_posterior)}' not yet implemented")
         return self.scale_factor * z
 
-    def get_learned_conditioning(self, c): ## first call 
+    def get_learned_conditioning(self, c, clip_context=None): ## first call 
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
-                c = self.cond_stage_model.encode(c)
+                c = self.cond_stage_model.encode(c, clip_context) # this  clip forward
                 if isinstance(c, DiagonalGaussianDistribution):
                     c = c.mode()
             else:
@@ -817,7 +817,7 @@ class LatentDiffusion(DDPM):
         return out
 
     @torch.no_grad()
-    def decode_first_stage(self, z, predict_cids=False, force_not_quantize=False):
+    def decode_first_stage(self, z, predict_cids=False, force_not_quantize=False, decoder_context=None):
         if predict_cids:
             if z.dim() == 4:
                 z = torch.argmax(z.exp(), dim=1).long()
@@ -825,7 +825,17 @@ class LatentDiffusion(DDPM):
             z = rearrange(z, 'b h w c -> b c h w').contiguous()
 
         z = 1. / self.scale_factor * z
-        return self.first_stage_model.decode(z)  # vae_decoder.onnx
+        
+        if decoder_context == None:
+            ret = self.first_stage_model.decode(z)
+        else:
+            ret = torch.zeros(1, 3, 256, 384, dtype=torch.float32).to("cuda")
+            decoder_buffer = []
+            decoder_buffer.append(z.reshape(-1).data_ptr())
+            decoder_buffer.append(ret.reshape(-1).data_ptr())
+            decoder_context.execute_v2(decoder_buffer)
+            
+        return ret  # vae_decoder.onnx
 
     @torch.no_grad()
     def encode_first_stage(self, x):
