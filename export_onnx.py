@@ -241,7 +241,7 @@ def export_hackathon_onnx(model):
 if __name__ == '__main__':
     
     model = create_model('./models/cldm_v15.yaml').cpu()
-    model.load_state_dict(load_state_dict('/home/player/models/control_sd15_canny.pth', location='cuda'))
+    model.load_state_dict(load_state_dict('/home/player/ControlNet/models/control_sd15_canny.pth', location='cuda'))
     
     export_hackathon_onnx(model)
     
