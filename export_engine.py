@@ -155,10 +155,10 @@ def export_engine():
                                                 max_shape = control_shape[i])
         
         
-    from_onnx('./unet.onnx',
-              './unet.plan',
-              unet_input_shape,
-              1 << 32)
+    # from_onnx('./unet.onnx',
+    #           './unet.plan',
+    #           unet_input_shape,
+    #           1 << 32)
         
         
     export_unet_shell = 'trtexec --onnx=./unet.onnx --saveEngine=./unet.plan --fp16 --optShapes=x_in:1x4x32x48,t_in:1,c_in:1x77x768'
