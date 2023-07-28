@@ -37,7 +37,7 @@ def export_hackathon_onnx(model):
     
     export_onnx(model=clip_model,
                 input=inputs_clip,
-                file='./onnx_model/clip.onnx',
+                file='./clip.onnx',
                 input_names=['input_ids'],
                 output_names=['text_embeddings', 'other_out'],
                 dynamic_axes={'input_ids': {0: 'B'}, 
@@ -58,14 +58,14 @@ def export_hackathon_onnx(model):
     
     inputs_decoder=torch.randn(batch_size, 4, latent_height, latent_width, dtype=torch.float32, device='cuda:0')
     
-    # export_onnx(model=vae_decoder, 
-    #             input=inputs_decoder,
-    #             file="./onnx_model/vae_decoder.onnx",
-    #             input_names=['latent'],
-    #             output_names=['images'],
-    #             dynamic_axes={'latent': {0: 'B', 2: 'H', 3: 'W'}, 
-    #                           'images': {0: 'B', 2: '8H', 3: '8W'}}
-    #             )
+    export_onnx(model=vae_decoder, 
+                input=inputs_decoder,
+                file="./vae_decoder.onnx",
+                input_names=['latent'],
+                output_names=['images'],
+                dynamic_axes={'latent': {0: 'B', 2: 'H', 3: 'W'}, 
+                              'images': {0: 'B', 2: '8H', 3: '8W'}}
+                )
     
     # ------------------------------
     # Export controlnet
@@ -86,13 +86,13 @@ def export_hackathon_onnx(model):
                      't_in': {0 : 'B'},
                      'c_in': {0 : 'B'}}
     
-    # export_onnx(model=control_model,
-    #             input=[x_in, h_in, t_in, c_in],
-    #             file="./onnx_model/controlnet.onnx",
-    #             input_names=['x_in', "h_in", "t_in", "c_in"],
-    #             output_names=output_names,
-    #             dynamic_axes=dynamic_table
-    #             )
+    export_onnx(model=control_model,
+                input=[x_in, h_in, t_in, c_in],
+                file="./controlnet.onnx",
+                input_names=['x_in', "h_in", "t_in", "c_in"],
+                output_names=output_names,
+                dynamic_axes=dynamic_table
+                )
     
     # ------------------------------
     # Export unet 
@@ -131,13 +131,13 @@ def export_hackathon_onnx(model):
         dynamic_table[f'control_{i}'] = {0 : 'B'}
     
 
-    # export_onnx(model=unet_model,
-    #             input=[x_in, t_in, c_in, control],
-    #             file="./unet_onnx/unet.onnx",
-    #             input_names=unet_input_names,
-    #             output_names=['unet_output'],
-    #             dynamic_axes=dynamic_table
-    #             )
+    export_onnx(model=unet_model,
+                input=[x_in, t_in, c_in, control],
+                file="./unet.onnx",
+                input_names=unet_input_names,
+                output_names=['unet_output'],
+                dynamic_axes=dynamic_table
+                )
     
     
         
@@ -164,7 +164,7 @@ def export_hackathon_onnx(model):
 
     # export_onnx(model=unet_model,
     #             input=[x_in, t_in, c_in],
-    #             file="./onnx_model/unet_first_half.onnx",
+    #             file="./unet_first_half.onnx",
     #             input_names=unet_fh_input_names,
     #             output_names=unet_fh_output_names,
     #             dynamic_axes=dynamic_table
@@ -229,7 +229,7 @@ def export_hackathon_onnx(model):
     
     # export_onnx(model=unet_model,
     #             input=[h, hs, emb, c_in, control],
-    #             file="./onnx_model/unet_second_half.onnx",
+    #             file="./unet_second_half.onnx",
     #             input_names=unet_sh_input_names,
     #             output_names=['unet_output'],
     #             dynamic_axes=dynamic_table
@@ -241,7 +241,7 @@ def export_hackathon_onnx(model):
 if __name__ == '__main__':
     
     model = create_model('./models/cldm_v15.yaml').cpu()
-    model.load_state_dict(load_state_dict('./models/control_sd15_canny.pth', location='cuda'))
+    model.load_state_dict(load_state_dict('/home/player/models/control_sd15_canny.pth', location='cuda'))
     
     export_hackathon_onnx(model)
     

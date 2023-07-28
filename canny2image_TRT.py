@@ -25,24 +25,24 @@ class hackathon():
     def initialize(self):
         self.apply_canny = CannyDetector()
         self.model = create_model('./models/cldm_v15.yaml') #.cpu()
-        self.model.load_state_dict(load_state_dict('./models/control_sd15_canny.pth', location='cuda'))
+        self.model.load_state_dict(load_state_dict('/home/player/Controlnet/models/control_sd15_canny.pth', location='cuda'))
         self.model = self.model.cuda()
         self.ddim_sampler = DDIMSampler(self.model)
     
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
 
-        if not os.path.isfile("./onnx_model/clip.onnx") or \
-           not os.path.isfile("./onnx_model/controlnet.onnx") or \
-           not os.path.isfile("./unet_onnx/unet.onnx") or \
-           not os.path.isfile("./onnx_model/vae_decoder.onnx"):               
-            export_hackathon_onnx(self.model)
+        # if not os.path.isfile("./onnx_model/clip.onnx") or \
+        #    not os.path.isfile("./onnx_model/controlnet.onnx") or \
+        #    not os.path.isfile("./unet_onnx/unet.onnx") or \
+        #    not os.path.isfile("./onnx_model/vae_decoder.onnx"):               
+        #     export_hackathon_onnx(self.model)
             
-        if not os.path.isfile("./engine_model/clip.engine") or \
-           not os.path.isfile("./engine_model/controlnet.engine") or \
-           not os.path.isfile("./engine_model/unet.engine") or \
-           not os.path.isfile("./engine_model/vae_decoder.engine"):   
-            export_engine()
+        # if not os.path.isfile("./clip.engine") or \
+        #    not os.path.isfile("./controlnet.engine") or \
+        #    not os.path.isfile("./unet.engine") or \
+        #    not os.path.isfile("./vae_decoder.engine"):   
+        #     export_engine()
 
         H = 256
         W = 384
@@ -57,7 +57,7 @@ class hackathon():
         # load clip engine
         # -------------------------------
             
-        # with open("./engine_model/clip.engine", 'rb') as f:
+        # with open("./clip.engine", 'rb') as f:
         #     engine_str = f.read()
         #     clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
         #     clip_context = clip_engine.create_execution_context()
@@ -68,7 +68,7 @@ class hackathon():
         # -------------------------------
         # load controlnet engine
         # -------------------------------
-        with open("./engine_model/controlnet.engine", 'rb') as f:
+        with open("./controlnet.engine", 'rb') as f:
             engine_str = f.read()
             control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             control_context = control_engine.create_execution_context()
@@ -83,7 +83,7 @@ class hackathon():
         # load unet engine
         # -------------------------------
         
-        with open("./engine_model/unet.engine", 'rb') as f:
+        with open("./unet.engine", 'rb') as f:
             engine_str = f.read()
             unet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             unet_context = unet_engine.create_execution_context()
@@ -116,7 +116,7 @@ class hackathon():
         # load decoder engine
         # -------------------------------
         
-        with open("./engine_model/vae_decoder.engine", 'rb') as f:
+        with open("./vae_decoder.engine", 'rb') as f:
             engine_str = f.read()
             decoder_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             decoder_context = decoder_engine.create_execution_context()
@@ -153,8 +153,10 @@ class hackathon():
             preprocess = time.time_ns() // 1000
 
 
-            cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples, self.model.clip_context)]}
-            un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples, self.model.clip_context)]}  # use clip net
+            # cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples, self.model.clip_context)]}
+            # un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples, self.model.clip_context)]}  # use clip net
+            cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples)]}
+            un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples)]}
             shape = (4, H // 8, W // 8)
             
             clip = time.time_ns() // 1000
@@ -178,15 +180,15 @@ class hackathon():
             x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy().clip(0, 255).astype(np.uint8)
 
             results = [x_samples[i] for i in range(num_samples)]
-            end = time.time_ns() // 1000
-            print("| Module      | Cost time|")
-            print("|---          |---       |")
-            print("| Preprocess  | {:8.3f} | \ ".format(1.0 * (preprocess - start) / 1000))
-            print("| Clip        | {:8.3f} | \ ".format(1.0 * (clip - preprocess) / 1000))
-            print("| Ctrl & Unet | {:8.3f} | \ ".format(1.0 * (ctrlnet - clip) / 1000))
-            print("| Decode      | {:8.3f} | \ ".format(1.0 * (decode - ctrlnet) / 1000))
-            print("| Postprocess | {:8.3f} | \ ".format(1.0 * (end - decode) / 1000))
-            print("| Total       | {:8.3f} | \ ".format(1.0 * (end - start) / 1000))            
+            # end = time.time_ns() // 1000
+            # print("| Module      | Cost time|")
+            # print("|---          |---       |")
+            # print("| Preprocess  | {:8.3f} | \ ".format(1.0 * (preprocess - start) / 1000))
+            # print("| Clip        | {:8.3f} | \ ".format(1.0 * (clip - preprocess) / 1000))
+            # print("| Ctrl & Unet | {:8.3f} | \ ".format(1.0 * (ctrlnet - clip) / 1000))
+            # print("| Decode      | {:8.3f} | \ ".format(1.0 * (decode - ctrlnet) / 1000))
+            # print("| Postprocess | {:8.3f} | \ ".format(1.0 * (end - decode) / 1000))
+            # print("| Total       | {:8.3f} | \ ".format(1.0 * (end - start) / 1000))            
             
         return results
     
