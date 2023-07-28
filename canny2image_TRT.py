@@ -38,10 +38,10 @@ class hackathon():
         #    not os.path.isfile("./onnx_model/vae_decoder.onnx"):               
         #     export_hackathon_onnx(self.model)
             
-        # if not os.path.isfile("./clip.engine") or \
-        #    not os.path.isfile("./controlnet.engine") or \
-        #    not os.path.isfile("./unet.engine") or \
-        #    not os.path.isfile("./vae_decoder.engine"):   
+        # if not os.path.isfile("./clip.plan") or \
+        #    not os.path.isfile("./controlnet.plan") or \
+        #    not os.path.isfile("./unet.plan") or \
+        #    not os.path.isfile("./vae_decoder.plan"):   
         #     export_engine()
 
         H = 256
@@ -57,7 +57,7 @@ class hackathon():
         # load clip engine
         # -------------------------------
             
-        # with open("./clip.engine", 'rb') as f:
+        # with open("./clip.plan", 'rb') as f:
         #     engine_str = f.read()
         #     clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
         #     clip_context = clip_engine.create_execution_context()
@@ -68,7 +68,7 @@ class hackathon():
         # -------------------------------
         # load controlnet engine
         # -------------------------------
-        with open("./controlnet.engine", 'rb') as f:
+        with open("./controlnet.plan", 'rb') as f:
             engine_str = f.read()
             control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             control_context = control_engine.create_execution_context()
@@ -83,7 +83,7 @@ class hackathon():
         # load unet engine
         # -------------------------------
         
-        with open("./unet.engine", 'rb') as f:
+        with open("./unet.plan", 'rb') as f:
             engine_str = f.read()
             unet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             unet_context = unet_engine.create_execution_context()
@@ -116,7 +116,7 @@ class hackathon():
         # load decoder engine
         # -------------------------------
         
-        with open("./vae_decoder.engine", 'rb') as f:
+        with open("./vae_decoder.plan", 'rb') as f:
             engine_str = f.read()
             decoder_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             decoder_context = decoder_engine.create_execution_context()
