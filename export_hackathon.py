@@ -6,7 +6,7 @@ model = hackathon()
 model.initialize()
 
 
-for i in range(3):
+for i in range(5):
     path = "/home/player/pictures_croped/bird_"+ str(i) + ".jpg"
     img = cv2.imread(path)
     start = datetime.datetime.now().timestamp()

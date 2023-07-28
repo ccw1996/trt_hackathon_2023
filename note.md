@@ -35,3 +35,14 @@ clip部分有bug，输出Nan
 | Decode      |   23.349 | \ 
 | Postprocess |    0.932 | \ 
 | Total       |  886.963 | \
+
+## 3, 使用 controlnet.engine、unet.engine 与 decoder.engine， 开启FP16 预存 controlnet 与 unet 使用的buffer
+
+| Module      | Cost time|
+|---          |---       |
+| Preprocess  |    4.542 | \ 
+| Clip        |   28.044 | \ 
+| Ctrl & Unet |  694.356 | \ 
+| Decode      |   24.171 | \ 
+| Postprocess |    0.922 | \ 
+| Total       |  752.035 | \ 

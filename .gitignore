@@ -6,6 +6,7 @@ unet_onnx/
 training/
 lightning_logs/
 image_log/
+out_imgs/**
 
 *.pth
 *.pt

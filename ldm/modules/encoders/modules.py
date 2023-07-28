@@ -121,6 +121,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         if clip_context == None:
             outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")  # use clip
         else :
+            # FIXME dynamicIMG
             text_emb = torch.zeros(1, 77, 768, dtype=torch.float32).to("cuda")
             other_out = torch.zeros(1, 768, dtype=torch.float32).to("cuda")
             clip_buffer = []
