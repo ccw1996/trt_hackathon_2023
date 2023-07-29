@@ -71,7 +71,7 @@ class hackathon():
         # -------------------------------
         # load controlUnet plan
         # -------------------------------
-        with open("./controlUnet.plan", 'rb') as f:
+        with open("./controlUnet_b2.plan", 'rb') as f:
             engine_str = f.read()
             controlUnet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             controlUnet_context = controlUnet_engine.create_execution_context()
