@@ -362,7 +362,6 @@ class ControlLDM(LatentDiffusion):
         for i in range(len(control_shape)):
             self.control_buffer.append(torch.zeros(control_shape[i], dtype=torch.float32).to('cuda'))
 
-        self.eps_buffer = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to("cuda")
     
     
     @torch.no_grad()
@@ -375,6 +374,67 @@ class ControlLDM(LatentDiffusion):
         control = einops.rearrange(control, 'b h w c -> b c h w')
         control = control.to(memory_format=torch.contiguous_format).float()
         return x, dict(c_crossattn=[c], c_concat=[control])
+
+
+    def apply_model_fusion_batch2(self, x_noisy, t, cond1, cond2, eps_buf=None, *args, **kwargs):
+        assert isinstance(cond1, dict) and isinstance(cond2, dict)
+        cond_txt1 = torch.cat(cond1['c_crossattn'], 1)
+        hint1 = torch.cat(cond1['c_concat'], 1)
+        
+        cond_txt2 = torch.cat(cond2['c_crossattn'], 1)
+        hint2 = torch.cat(cond2['c_concat'], 1)
+
+        cond_txt = torch.cat([cond_txt1, cond_txt2], dim=0)
+        hint = torch.cat([hint1, hint2], dim=0)
+        
+        x_in = torch.cat([x_noisy, x_noisy], dim=0)
+        t_in = torch.cat([t, t], dim=0)
+        
+        if self.controlunet_context == None:
+            return self.fusion_forward(x_in, hint, t_in, cond_txt)
+        else:
+            buffer = []
+            buffer.append(x_in.reshape(-1).data_ptr())
+            buffer.append(hint.reshape(-1).data_ptr())
+            buffer.append(t_in.reshape(-1).data_ptr())
+            buffer.append(cond_txt.reshape(-1).data_ptr())
+            if eps_buf == None:
+                eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to('cuda')
+            else:
+                eps = eps_buf
+            buffer.append(eps.reshape(-1).data_ptr())
+            
+            self.controlunet_context.execute_v2(buffer)
+            return eps
+        
+    
+    def apply_model_fusion(self, x_noisy, t, cond, eps_buf=None, *args, **kwargs):
+        assert isinstance(cond, dict)
+        cond_txt = torch.cat(cond['c_crossattn'], 1)
+        hint = torch.cat(cond['c_concat'], 1)
+        
+        if self.controlunet_context == None:
+            return self.fusion_forward(x_noisy, hint, t, cond_txt)
+        else:
+            buffer = []
+            buffer.append(x_noisy.reshape(-1).data_ptr())
+            buffer.append(hint.reshape(-1).data_ptr())
+            buffer.append(t.reshape(-1).data_ptr())
+            buffer.append(cond_txt.reshape(-1).data_ptr())
+            if eps_buf == None:
+                eps = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to('cuda')
+            else:
+                eps = eps_buf
+            buffer.append(eps.reshape(-1).data_ptr())
+            
+            self.controlunet_context.execute_v2(buffer)
+            return eps
+            
+    
+    def fusion_forward(self, x, hint, timesteps, context):
+        control = self.control_model(x=x, hint=hint, timesteps=timesteps, context=context)
+        eps = self.model.diffusion_model(x=x, timesteps=timesteps, context=context, control=control, only_mid_control=self.only_mid_control)
+        return eps
 
     def apply_model(self, x_noisy, t, cond, eps_buf=None, *args, **kwargs):
         assert isinstance(cond, dict)
@@ -400,33 +460,6 @@ class ControlLDM(LatentDiffusion):
                 # control_out = []
                 ct_time = time.time_ns() // 1000
                 
-                # for i in range(3):
-                #     temp = torch.zeros(b, 320, h, w, dtype=torch.float32).to("cuda")
-                #     control_out.append(temp)
-                #     buffer_device.append(temp.reshape(-1).data_ptr())
-                
-                # temp = torch.zeros(b, 320, h//2, w//2, dtype=torch.float32).to("cuda")
-                # control_out.append(temp)
-                # buffer_device.append(temp.reshape(-1).data_ptr())
-
-                # for i in range(2):
-                #     temp = torch.zeros(b, 640, h//2, w//2, dtype=torch.float32).to("cuda")
-                #     control_out.append(temp)
-                #     buffer_device.append(temp.reshape(-1).data_ptr())
-
-                # temp = torch.zeros(b, 640, h//4, w//4, dtype=torch.float32).to("cuda")
-                # control_out.append(temp)
-                # buffer_device.append(temp.reshape(-1).data_ptr())
-
-                # for i in range(2):
-                #     temp = torch.zeros(b, 1280, h//4, w//4, dtype=torch.float32).to("cuda")
-                #     control_out.append(temp)
-                #     buffer_device.append(temp.reshape(-1).data_ptr())
-
-                # for i in range(4):
-                #     temp = torch.zeros(b, 1280, h//8, w//8, dtype=torch.float32).to("cuda")
-                #     control_out.append(temp)
-                #     buffer_device.append(temp.reshape(-1).data_ptr())
                 for i in range(len(self.control_buffer)):
                     buffer_device.append(self.control_buffer[i].reshape(-1).data_ptr())
 

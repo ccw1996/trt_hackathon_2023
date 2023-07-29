@@ -18,6 +18,7 @@ class DDIMSampler(object):
         self.eps_buffer1 = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to('cuda')
         self.eps_buffer2 = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to('cuda')
     
+        self.epsf_buffer = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to('cuda')
         
 
     def register_buffer(self, name, attr):
@@ -193,8 +194,20 @@ class DDIMSampler(object):
         if unconditional_conditioning is None or unconditional_guidance_scale == 1.:
             model_output = self.model.apply_model(x, t, c)
         else:  # this
-            model_t = self.model.apply_model(x, t, c, eps_buf=self.eps_buffer1) 
-            model_uncond = self.model.apply_model(x, t, unconditional_conditioning, eps_buf=self.eps_buffer2)
+            
+            ret = self.model.apply_model_fusion_batch2(x, t, c, unconditional_conditioning, self.epsf_buffer)
+            model_t = ret[0:1, ...]
+            model_uncond = ret[1:2, ...]
+            
+            
+            # model_t = self.model.apply_model_fusion(x, t, c, eps_buf=self.eps_buffer1) 
+            # model_uncond = self.model.apply_model_fusion(x, t, unconditional_conditioning, eps_buf=self.eps_buffer2)
+        
+            # model_t = self.model.apply_model(x, t, c, eps_buf=self.eps_buffer1) 
+            # model_uncond = self.model.apply_model(x, t, unconditional_conditioning, eps_buf=self.eps_buffer2)
+            
+            
+            
             model_output = model_uncond + unconditional_guidance_scale * (model_t - model_uncond)
 
         if self.model.parameterization == "v":

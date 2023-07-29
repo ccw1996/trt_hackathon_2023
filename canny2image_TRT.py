@@ -51,6 +51,7 @@ class hackathon():
         self.model.control_context = None
         self.model.unet_context = None
         self.model.decoder_context = None
+        self.model.controlunet_context = None
         
     
         # -------------------------------
@@ -65,58 +66,74 @@ class hackathon():
         #     clip_context.set_binding_shape(0, (1, 77))
         #     self.model.clip_context = clip_context
             
+            
+            
         # -------------------------------
-        # load controlnet engine
+        # load controlUnet plan
         # -------------------------------
-        with open("./controlnet.plan", 'rb') as f:
+        with open("./controlUnet.plan", 'rb') as f:
             engine_str = f.read()
-            control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-            control_context = control_engine.create_execution_context()
+            controlUnet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+            controlUnet_context = controlUnet_engine.create_execution_context()
 
-            control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-            control_context.set_binding_shape(1, (1, 3, H, W))
-            control_context.set_binding_shape(2, (1,))
-            control_context.set_binding_shape(3, (1, 77, 768))
-            self.model.control_context = control_context
+            controlUnet_context.set_binding_shape(0, (2, 4, H // 8, W // 8))
+            controlUnet_context.set_binding_shape(1, (2, 3, H, W))
+            controlUnet_context.set_binding_shape(2, (2,))
+            controlUnet_context.set_binding_shape(3, (2, 77, 768))
+            self.model.controlunet_context = controlUnet_context
+            
+        # # -------------------------------
+        # # load controlnet engine
+        # # -------------------------------
+        # with open("./engine_model/controlnet.engine", 'rb') as f:
+        #     engine_str = f.read()
+        #     control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+        #     control_context = control_engine.create_execution_context()
+
+        #     control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
+        #     control_context.set_binding_shape(1, (1, 3, H, W))
+        #     control_context.set_binding_shape(2, (1,))
+        #     control_context.set_binding_shape(3, (1, 77, 768))
+        #     self.model.control_context = control_context
         
-        # -------------------------------
-        # load unet engine
-        # -------------------------------
+        # # -------------------------------
+        # # load unet engine
+        # # -------------------------------
         
-        with open("./unet.plan", 'rb') as f:
-            engine_str = f.read()
-            unet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-            unet_context = unet_engine.create_execution_context()
+        # with open("./engine_model/unet.engine", 'rb') as f:
+        #     engine_str = f.read()
+        #     unet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+        #     unet_context = unet_engine.create_execution_context()
             
-            unet_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-            unet_context.set_binding_shape(1, (1,))
-            unet_context.set_binding_shape(2, (1, 77, 768))
+        #     unet_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
+        #     unet_context.set_binding_shape(1, (1,))
+        #     unet_context.set_binding_shape(2, (1, 77, 768))
             
-            control_shape = []
-            control_shape.append([1, 320, 32, 48])
-            control_shape.append([1, 320, 32, 48])
-            control_shape.append([1, 320, 32, 48])
-            control_shape.append([1, 320, 16, 24])
-            control_shape.append([1, 640, 16, 24])
-            control_shape.append([1, 640, 16, 24])
-            control_shape.append([1, 640, 8, 12])
-            control_shape.append([1, 1280, 8, 12])
-            control_shape.append([1, 1280, 8, 12])
-            control_shape.append([1, 1280, 4, 6])
-            control_shape.append([1, 1280, 4, 6])
-            control_shape.append([1, 1280, 4, 6])
-            control_shape.append([1, 1280, 4, 6])
+        #     control_shape = []
+        #     control_shape.append([1, 320, 32, 48])
+        #     control_shape.append([1, 320, 32, 48])
+        #     control_shape.append([1, 320, 32, 48])
+        #     control_shape.append([1, 320, 16, 24])
+        #     control_shape.append([1, 640, 16, 24])
+        #     control_shape.append([1, 640, 16, 24])
+        #     control_shape.append([1, 640, 8, 12])
+        #     control_shape.append([1, 1280, 8, 12])
+        #     control_shape.append([1, 1280, 8, 12])
+        #     control_shape.append([1, 1280, 4, 6])
+        #     control_shape.append([1, 1280, 4, 6])
+        #     control_shape.append([1, 1280, 4, 6])
+        #     control_shape.append([1, 1280, 4, 6])
             
-            for i in range(len(control_shape)):
-                unet_context.set_binding_shape(3 + i, tuple(control_shape[i]))
+        #     for i in range(len(control_shape)):
+        #         unet_context.set_binding_shape(3 + i, tuple(control_shape[i]))
             
-            self.model.unet_context = unet_context
+        #     self.model.unet_context = unet_context
             
         # -------------------------------
         # load decoder engine
         # -------------------------------
         
-        with open("./vae_decoder.plan", 'rb') as f:
+        with open("./engine_model/vae_decoder.engine", 'rb') as f:
             engine_str = f.read()
             decoder_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             decoder_context = decoder_engine.create_execution_context()
@@ -180,15 +197,15 @@ class hackathon():
             x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy().clip(0, 255).astype(np.uint8)
 
             results = [x_samples[i] for i in range(num_samples)]
-            # end = time.time_ns() // 1000
-            # print("| Module      | Cost time|")
-            # print("|---          |---       |")
-            # print("| Preprocess  | {:8.3f} | \ ".format(1.0 * (preprocess - start) / 1000))
-            # print("| Clip        | {:8.3f} | \ ".format(1.0 * (clip - preprocess) / 1000))
-            # print("| Ctrl & Unet | {:8.3f} | \ ".format(1.0 * (ctrlnet - clip) / 1000))
-            # print("| Decode      | {:8.3f} | \ ".format(1.0 * (decode - ctrlnet) / 1000))
-            # print("| Postprocess | {:8.3f} | \ ".format(1.0 * (end - decode) / 1000))
-            # print("| Total       | {:8.3f} | \ ".format(1.0 * (end - start) / 1000))            
+            end = time.time_ns() // 1000
+            print("| Module      | Cost time|")
+            print("|---          |---       |")
+            print("| Preprocess  | {:8.3f} | \ ".format(1.0 * (preprocess - start) / 1000))
+            print("| Clip        | {:8.3f} | \ ".format(1.0 * (clip - preprocess) / 1000))
+            print("| Ctrl & Unet | {:8.3f} | \ ".format(1.0 * (ctrlnet - clip) / 1000))
+            print("| Decode      | {:8.3f} | \ ".format(1.0 * (decode - ctrlnet) / 1000))
+            print("| Postprocess | {:8.3f} | \ ".format(1.0 * (end - decode) / 1000))
+            print("| Total       | {:8.3f} | \ ".format(1.0 * (end - start) / 1000))            
             
         return results
     
