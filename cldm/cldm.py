@@ -375,6 +375,29 @@ class ControlLDM(LatentDiffusion):
         control = einops.rearrange(control, 'b h w c -> b c h w')
         control = control.to(memory_format=torch.contiguous_format).float()
         return x, dict(c_crossattn=[c], c_concat=[control])
+    
+    def fusion_forward(self, x, hint, timesteps, context):
+        control = self.control_model(x=x, hint=hint, timesteps=timesteps, context=context)
+        eps = self.model.diffusion_model(x=x, timesteps=timesteps, context=context, control=control, only_mid_control=self.only_mid_control)
+        return eps
+    
+    def apply_model_fusion(self,x_noisy,t,cond,eps_buf=None,*args, **kwargs):
+        assert isinstance(cond, dict)
+        cond_txt = torch.cat(cond['c_crossattn'], 1)
+        hint = torch.cat(cond['c_concat'], 1)
+        buffer = []
+        buffer.append(x_noisy.reshape(-1).data_ptr())
+        buffer.append(hint.reshape(-1).data_ptr())
+        buffer.append(t.reshape(-1).data_ptr())
+        buffer.append(cond_txt.reshape(-1).data_ptr())
+        if eps_buf == None:
+            eps = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to('cuda')
+        else:
+            eps = eps_buf
+        buffer.append(eps.reshape(-1).data_ptr())
+
+        self.controlunet_context.execute_v2(buffer)
+        return eps
 
     def apply_model(self, x_noisy, t, cond, eps_buf=None, *args, **kwargs):
         assert isinstance(cond, dict)
@@ -396,48 +419,15 @@ class ControlLDM(LatentDiffusion):
                 buffer_device.append(hint_in.reshape(-1).data_ptr())
                 buffer_device.append(t.reshape(-1).data_ptr())
                 buffer_device.append(cond_txt.reshape(-1).data_ptr())
-                
-                # control_out = []
+
                 ct_time = time.time_ns() // 1000
                 
-                # for i in range(3):
-                #     temp = torch.zeros(b, 320, h, w, dtype=torch.float32).to("cuda")
-                #     control_out.append(temp)
-                #     buffer_device.append(temp.reshape(-1).data_ptr())
-                
-                # temp = torch.zeros(b, 320, h//2, w//2, dtype=torch.float32).to("cuda")
-                # control_out.append(temp)
-                # buffer_device.append(temp.reshape(-1).data_ptr())
-
-                # for i in range(2):
-                #     temp = torch.zeros(b, 640, h//2, w//2, dtype=torch.float32).to("cuda")
-                #     control_out.append(temp)
-                #     buffer_device.append(temp.reshape(-1).data_ptr())
-
-                # temp = torch.zeros(b, 640, h//4, w//4, dtype=torch.float32).to("cuda")
-                # control_out.append(temp)
-                # buffer_device.append(temp.reshape(-1).data_ptr())
-
-                # for i in range(2):
-                #     temp = torch.zeros(b, 1280, h//4, w//4, dtype=torch.float32).to("cuda")
-                #     control_out.append(temp)
-                #     buffer_device.append(temp.reshape(-1).data_ptr())
-
-                # for i in range(4):
-                #     temp = torch.zeros(b, 1280, h//8, w//8, dtype=torch.float32).to("cuda")
-                #     control_out.append(temp)
-                #     buffer_device.append(temp.reshape(-1).data_ptr())
                 for i in range(len(self.control_buffer)):
                     buffer_device.append(self.control_buffer[i].reshape(-1).data_ptr())
 
                 ctrl_start = time.time_ns() // 1000
                 self.control_context.execute_v2(buffer_device)   # controlnet forward
                 ctrl_end = time.time_ns() // 1000
-                
-                # print(" Malloc Tensor Mem : {:7.3f} ms".format(1.0 * (ctrl_start - ct_time) / 1000))
-                # print(" ControlNet Engine : {:7.3f} ms".format(1.0 * (ctrl_end - ctrl_start) / 1000))
-                
-                # control = [c * scale for c, scale in zip(control_out, self.control_scales)]
                 control = [c * scale for c, scale in zip(self.control_buffer, self.control_scales)]
                 
             

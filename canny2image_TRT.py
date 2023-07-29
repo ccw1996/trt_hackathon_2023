@@ -51,6 +51,7 @@ class hackathon():
         self.model.control_context = None
         self.model.unet_context = None
         self.model.decoder_context = None
+        self.model.controlunet_context=None
         
     
         # -------------------------------
@@ -68,49 +69,16 @@ class hackathon():
         # -------------------------------
         # load controlnet engine
         # -------------------------------
-        with open("./controlnet.plan", 'rb') as f:
+        with open("./controlunet.plan", 'rb') as f:
             engine_str = f.read()
-            control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-            control_context = control_engine.create_execution_context()
+            controlunet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+            controlunet_context = controlunet_engine.create_execution_context()
 
-            control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-            control_context.set_binding_shape(1, (1, 3, H, W))
-            control_context.set_binding_shape(2, (1,))
-            control_context.set_binding_shape(3, (1, 77, 768))
-            self.model.control_context = control_context
-        
-        # -------------------------------
-        # load unet engine
-        # -------------------------------
-        
-        with open("./unet.plan", 'rb') as f:
-            engine_str = f.read()
-            unet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-            unet_context = unet_engine.create_execution_context()
-            
-            unet_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-            unet_context.set_binding_shape(1, (1,))
-            unet_context.set_binding_shape(2, (1, 77, 768))
-            
-            control_shape = []
-            control_shape.append([1, 320, 32, 48])
-            control_shape.append([1, 320, 32, 48])
-            control_shape.append([1, 320, 32, 48])
-            control_shape.append([1, 320, 16, 24])
-            control_shape.append([1, 640, 16, 24])
-            control_shape.append([1, 640, 16, 24])
-            control_shape.append([1, 640, 8, 12])
-            control_shape.append([1, 1280, 8, 12])
-            control_shape.append([1, 1280, 8, 12])
-            control_shape.append([1, 1280, 4, 6])
-            control_shape.append([1, 1280, 4, 6])
-            control_shape.append([1, 1280, 4, 6])
-            control_shape.append([1, 1280, 4, 6])
-            
-            for i in range(len(control_shape)):
-                unet_context.set_binding_shape(3 + i, tuple(control_shape[i]))
-            
-            self.model.unet_context = unet_context
+            controlunet_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
+            controlunet_context.set_binding_shape(1, (1, 3, H, W))
+            controlunet_context.set_binding_shape(2, (1,))
+            controlunet_context.set_binding_shape(3, (1, 77, 768))
+            self.model.controlunet_context = controlunet_context
             
         # -------------------------------
         # load decoder engine
