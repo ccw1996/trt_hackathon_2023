@@ -33,7 +33,7 @@ def export_hackathon_onnx(model):
     print("------------ Export Clip ------------")    
     clip_model = model.cond_stage_model.transformer
     batch_size = 1
-    inputs_clip=torch.zeros(batch_size, 77, dtype=torch.int64, device="cuda:0")
+    inputs_clip=torch.zeros(batch_size, 77, dtype=torch.int32, device="cuda:0")
     
     export_onnx(model=clip_model,
                 input=inputs_clip,
