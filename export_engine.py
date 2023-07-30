@@ -75,7 +75,7 @@ def export_engine():
     from_onnx('./clip.onnx',
               './clip.plan',
               clip_input_shape,
-              1 << 32,
+              1 << 32,fp16_mode=False
               )
     print("-------- Export clip.plan : Done! --------")
     
@@ -108,10 +108,6 @@ def export_engine():
                                               opt_shape = [1, 77, 768],
                                               max_shape = [1, 77, 768]))
     
-    # from_onnx('./controlunet.onnx',
-    #           './controlunet.plan',
-    #           controlunet_input_shape,
-    #           1 << 32)
     print("----- Export controlnet.plan : Done! -----")     
         
     export_unet_shell = 'trtexec --onnx=./controlunet.onnx --saveEngine=./controlunet.plan --fp16 --optShapes=x_in:1x4x32x48,t_in:1,c_in:1x77x768,h_in:1x3x256x384'
