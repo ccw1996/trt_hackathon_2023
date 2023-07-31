@@ -72,10 +72,10 @@ def export_engine():
     clip_input_shape = dict(input_ids = dict(min_shape = [1, 77],
                                              opt_shape = [1, 77],
                                              max_shape = [1, 77]))
-    from_onnx('./clip.onnx',
+    from_onnx('./clip_optimize.onnx',
               './clip.plan',
               clip_input_shape,
-              1 << 32,fp16_mode=False,tf32=False,
+              1 << 32,fp16_mode=False
               )
     print("-------- Export clip.plan : Done! --------")
     

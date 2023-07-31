@@ -1,5 +1,9 @@
 from cldm.model import create_model, load_state_dict
 import torch
+import onnx
+import onnx_graphsurgeon as gs
+from polygraphy.backend.onnx.loader import fold_constants
+from onnx import shape_inference
 
 
 def export_onnx(model, input, file, input_names, output_names, dynamic_axes):
@@ -39,10 +43,9 @@ def export_hackathon_onnx(model):
                 input=inputs_clip,
                 file='./clip.onnx',
                 input_names=['input_ids'],
-                output_names=['text_embeddings', 'other_out'],
+                output_names=['text_embeddings', 'pooler_output'],
                 dynamic_axes={'input_ids': {0: 'B'}, 
-                               'text_embeddings': {0: 'B'},
-                               'other_out' : {0 : 'B'}}
+                               'text_embeddings': {0: 'B'}}
                 )
 
     # ------------------------------
@@ -94,10 +97,50 @@ def export_hackathon_onnx(model):
                 dynamic_axes=dynamic_table
                 )
 
+class Optimizer:
+    def __init__(self, onnx_graph):
+        self.graph = gs.import_onnx(onnx_graph)
+
+    def cleanup(self, return_onnx=False):
+        self.graph.cleanup().toposort()
+        if return_onnx:
+            return gs.export_onnx(self.graph)
+
+    def select_outputs(self, keep, names=None):
+        self.graph.outputs = [self.graph.outputs[o] for o in keep]
+        if names:
+            for i, name in enumerate(names):
+                self.graph.outputs[i].name = name
+
+    def fold_constants(self, return_onnx=False):
+        onnx_graph = fold_constants(gs.export_onnx(self.graph), allow_onnxruntime_shape_inference=True)
+        self.graph = gs.import_onnx(onnx_graph)
+        if return_onnx:
+            return onnx_graph
+
+    def infer_shapes(self, return_onnx=False):
+        onnx_graph = gs.export_onnx(self.graph)
+        if onnx_graph.ByteSize() > 2147483648:
+            raise TypeError("ERROR: model size exceeds supported 2GB limit")
+        else:
+            onnx_graph = shape_inference.infer_shapes(onnx_graph)
+
+        self.graph = gs.import_onnx(onnx_graph)
+        if return_onnx:
+            return onnx_graph
+
+
 if __name__ == '__main__':
     
     model = create_model('./models/cldm_v15.yaml').cpu()
     model.load_state_dict(load_state_dict('/home/player/ControlNet/models/control_sd15_canny.pth', location='cuda'))
     
     export_hackathon_onnx(model)
-    
+    opt = Optimizer(onnx.load('./clip.onnx'))
+    opt.select_outputs([0])  # delete graph output#1
+    opt.cleanup()
+    opt.fold_constants()
+    opt.infer_shapes()
+    opt.select_outputs([0], names=["text_embeddings"])  # rename network output
+    opt_onnx_graph = opt.cleanup(return_onnx=True)
+    onnx.save(opt_onnx_graph, "./clip_optimize.onnx")
