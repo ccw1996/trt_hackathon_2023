@@ -78,16 +78,16 @@ def export_hackathon_onnx(model):
     model.forward=model.fusion_forward
     #check validation
     controlunet_model=model
-    x_in = torch.randn(1, 4, latent_height, latent_width, dtype=torch.float32, device='cuda:0')
-    h_in = torch.randn(1, 3, image_height, image_width, dtype=torch.float32, device='cuda:0')
-    t_in = torch.zeros(1, dtype=torch.int64, device='cuda:0')
-    c_in = torch.randn(1, 77, 768, dtype=torch.float32, device='cuda:0')
+    x_in = torch.randn(2, 4, latent_height, latent_width, dtype=torch.float32, device='cuda:0')
+    h_in = torch.randn(2, 3, image_height, image_width, dtype=torch.float32, device='cuda:0')
+    t_in = torch.zeros(2, dtype=torch.int64, device='cuda:0')
+    c_in = torch.randn(2, 77, 768, dtype=torch.float32, device='cuda:0')
 
-    dynamic_table = {'x_in': {0 : 'B', 2 : 'H', 3 : 'W'}, 
-                     'h_in': {0 : 'B', 2 : '8H', 3 : '8W'}, 
-                     't_in': {0 : 'B'},
-                     'c_in': {0 : 'B'},
-                     'output':{0 : 'B', 2 : 'H', 3 : 'W'}}
+    dynamic_table = {'x_in': {0 : '2B', 2 : 'H', 3 : 'W'}, 
+                     'h_in': {0 : '2B', 2 : '8H', 3 : '8W'}, 
+                     't_in': {0 : '2B'},
+                     'c_in': {0 : '2B'},
+                     'output':{0 : '2B', 2 : 'H', 3 : 'W'}}
     
     export_onnx(model=controlunet_model,
                 input=[x_in, h_in, t_in, c_in],

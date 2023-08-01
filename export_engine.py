@@ -95,22 +95,22 @@ def export_engine():
     # ---------------------------------
     # Export controlnet.plan
     # ---------------------------------
-    controlunet_input_shape = dict(x_in = dict(min_shape = [1, 4, latent_height, latent_width],
-                                              opt_shape = [1, 4, latent_height, latent_width],
-                                              max_shape = [1, 4, latent_height, latent_width]),
-                                  h_in = dict(min_shape = [1, 3, image_height, image_width],
-                                              opt_shape = [1, 3, image_height, image_width],
-                                              max_shape = [1, 3, image_height, image_width]),
-                                  t_in = dict(min_shape = [1],
-                                              opt_shape = [1],
-                                              max_shape = [1]),
-                                  c_in = dict(min_shape = [1, 77, 768],
-                                              opt_shape = [1, 77, 768],
-                                              max_shape = [1, 77, 768]))
+    controlunet_input_shape = dict(x_in = dict(min_shape = [2, 4, latent_height, latent_width],
+                                              opt_shape = [2, 4, latent_height, latent_width],
+                                              max_shape = [2, 4, latent_height, latent_width]),
+                                  h_in = dict(min_shape = [2, 3, image_height, image_width],
+                                              opt_shape = [2, 3, image_height, image_width],
+                                              max_shape = [2, 3, image_height, image_width]),
+                                  t_in = dict(min_shape = [2],
+                                              opt_shape = [2],
+                                              max_shape = [2]),
+                                  c_in = dict(min_shape = [2, 77, 768],
+                                              opt_shape = [2, 77, 768],
+                                              max_shape = [2, 77, 768]))
     
     print("----- Export controlnet.plan : Done! -----")     
         
-    export_unet_shell = 'trtexec --onnx=./controlunet.onnx --saveEngine=./controlunet.plan --fp16 --optShapes=x_in:1x4x32x48,t_in:1,c_in:1x77x768,h_in:1x3x256x384'
+    export_unet_shell = 'trtexec --onnx=./controlunet.onnx --saveEngine=./controlunet.plan --fp16 --optShapes=x_in:2x4x32x48,t_in:2,c_in:2x77x768,h_in:2x3x256x384'
     print(export_unet_shell)
     
     os.system(export_unet_shell)

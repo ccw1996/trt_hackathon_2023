@@ -381,6 +381,31 @@ class ControlLDM(LatentDiffusion):
         eps = self.model.diffusion_model(x=x, timesteps=timesteps, context=context, control=control, only_mid_control=self.only_mid_control)
         return eps
     
+    def apply_model_fusion_batch2(self,x_noisy,t,cond1,cond2,eps_buf=None,*args, **kwargs):
+        x_in = torch.cat([x_noisy] * 2)
+        t_in = torch.cat([t] * 2)
+        cond_txt1 = torch.cat(cond1['c_crossattn'], 1)
+        hint1 = torch.cat(cond1['c_concat'], 1)
+
+        cond_txt2 = torch.cat(cond2['c_crossattn'], 1)
+        hint2 = torch.cat(cond2['c_concat'], 1)
+        cond_txt = torch.cat([cond_txt1, cond_txt2], dim=0)
+        hint = torch.cat([hint1, hint2], dim=0)
+        buffer = []
+        buffer.append(x_in.reshape(-1).data_ptr())
+        buffer.append(hint.reshape(-1).data_ptr())
+        buffer.append(t_in.reshape(-1).data_ptr())
+        buffer.append(cond_txt.reshape(-1).data_ptr())
+        if eps_buf == None:
+            eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to('cuda')
+        else:
+            eps = eps_buf
+        buffer.append(eps.reshape(-1).data_ptr())
+
+        self.controlunet_context.execute_v2(buffer)
+        return eps
+        
+    
     def apply_model_fusion(self,x_noisy,t,cond,eps_buf=None,*args, **kwargs):
         assert isinstance(cond, dict)
         cond_txt = torch.cat(cond['c_crossattn'], 1)
