@@ -80,7 +80,7 @@ def export_hackathon_onnx(model):
     controlunet_model=model
     x_in = torch.randn(2, 4, latent_height, latent_width, dtype=torch.float32, device='cuda:0')
     h_in = torch.randn(2, 3, image_height, image_width, dtype=torch.float32, device='cuda:0')
-    t_in = torch.zeros(2, dtype=torch.int64, device='cuda:0')
+    t_in = torch.zeros(2, dtype=torch.int32, device='cuda:0')
     c_in = torch.randn(2, 77, 768, dtype=torch.float32, device='cuda:0')
 
     dynamic_table = {'x_in': {0 : '2B', 2 : 'H', 3 : 'W'}, 
