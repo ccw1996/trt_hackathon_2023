@@ -74,10 +74,10 @@ class hackathon():
             controlunet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             controlunet_context = controlunet_engine.create_execution_context()
 
-            controlunet_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-            controlunet_context.set_binding_shape(1, (1, 3, H, W))
-            controlunet_context.set_binding_shape(2, (1,))
-            controlunet_context.set_binding_shape(3, (1, 77, 768))
+            controlunet_context.set_binding_shape(0, (2, 4, H // 8, W // 8))
+            controlunet_context.set_binding_shape(1, (2, 3, H, W))
+            controlunet_context.set_binding_shape(2, (2,))
+            controlunet_context.set_binding_shape(3, (2, 77, 768))
             self.model.controlunet_context = controlunet_context
             
         # -------------------------------
