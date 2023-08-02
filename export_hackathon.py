@@ -25,5 +25,5 @@ for i in range(10):
             100, 
             200)
     
-    cv2.imwrite(f'out_imgs/bird_fusion_{i}.jpg', new_img[0])
+    cv2.imwrite(f'out_imgs/bird_fusionttt_{i}.jpg', new_img[0])
     

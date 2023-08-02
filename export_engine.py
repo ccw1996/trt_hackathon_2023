@@ -116,7 +116,7 @@ def export_engine():
                                             max_shape = [2, 77, 768]))
   
       
-    export_ctrlunet_shell = 'trtexec --onnx=./controlUnet_onnx/controlUnet.onnx --saveEngine=./controlUnet_b2.plan --fp16 '
+    export_ctrlunet_shell = 'trtexec --onnx=./controlUnet_b2_onnx/controlUnet_b2.onnx --saveEngine=./controlUnet_b2.plan --fp16 '
     # --optShapes=x_in:1x4x32x48,t_in:1,c_in:1x77x768'
     
     export_ctrlunet_shell += ' --minShapes='

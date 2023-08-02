@@ -1,5 +1,5 @@
 """SAMPLING ONLY."""
-
+import time
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -166,7 +166,8 @@ class DDIMSampler(object):
             if ucg_schedule is not None: # not this
                 assert len(ucg_schedule) == len(time_range)
                 unconditional_guidance_scale = ucg_schedule[i]
-
+            
+            # ddim_start = time.time_ns() // 1000
             outs = self.p_sample_ddim(img, cond, ts, index=index, use_original_steps=ddim_use_original_steps,
                                       quantize_denoised=quantize_denoised, temperature=temperature,
                                       noise_dropout=noise_dropout, score_corrector=score_corrector,
@@ -174,6 +175,11 @@ class DDIMSampler(object):
                                       unconditional_guidance_scale=unconditional_guidance_scale,
                                       unconditional_conditioning=unconditional_conditioning,
                                       dynamic_threshold=dynamic_threshold)  ## 
+            
+            # ddim_end = time.time_ns() // 1000
+            # print("ddim cost time : {:7.3f}".format(1.0 * (ddim_end - ddim_start) / 1000)) # ~27.8ms
+            
+            
             img, pred_x0 = outs
             if callback: callback(i)
             if img_callback: img_callback(pred_x0, i)
@@ -194,8 +200,12 @@ class DDIMSampler(object):
         if unconditional_conditioning is None or unconditional_guidance_scale == 1.:
             model_output = self.model.apply_model(x, t, c)
         else:  # this
-            
+            # net_start = time.time_ns() // 1000
             ret = self.model.apply_model_fusion_batch2(x, t, c, unconditional_conditioning, self.epsf_buffer)
+            # net_end = time.time_ns() // 1000
+            # print("net cost time : {:7.3f}".format(1.0 * (net_end - net_start) / 1000)) # ~26.8ms
+            
+            
             model_t = ret[0:1, ...]
             model_uncond = ret[1:2, ...]
             
