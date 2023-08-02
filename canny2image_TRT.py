@@ -111,9 +111,6 @@ class hackathon():
                 seed = random.randint(0, 65535)
             seed_everything(seed)
 
-            if config.save_memory:
-                self.model.low_vram_shift(is_diffusing=False)
-
             cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples, self.model.clip_context)]}
             un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples, self.model.clip_context)]}  # use clip net
             shape = (4, H // 8, W // 8)
