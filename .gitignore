@@ -8,6 +8,9 @@ lightning_logs/
 image_log/
 out_imgs/**
 
+controlUnet_b2_onnx/
+controlUnet_onnx/
+*.plan
 *.pth
 *.pt
 *.ckpt
