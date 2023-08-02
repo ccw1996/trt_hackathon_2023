@@ -26,11 +26,6 @@ def from_onnx(onnx_model: str,
     if isinstance(onnx_model, str):
         onnx_graph = onnx.load(onnx_model)
 
-
-    # if onnx_graph.ByteSize() > 2147483648:  # for unet
-    #     onnx.shape_inference.infer_shapes_path(onnx_model)
-    #     onnx_graph = onnx.load(onnx_model)
-
     if not parser.parse(onnx_graph.SerializeToString()):
         error_msgs = ''
         for error in range(parser.num_errors):
@@ -77,10 +72,10 @@ def export_engine():
     clip_input_shape = dict(input_ids = dict(min_shape = [1, 77],
                                              opt_shape = [1, 77],
                                              max_shape = [1, 77]))
-    from_onnx('./clip.onnx',
+    from_onnx('./clip_optimize.onnx',
               './clip.plan',
               clip_input_shape,
-              1 << 32,
+              1 << 32,fp16_mode=False
               )
     print("-------- Export clip.plan : Done! --------")
     
@@ -100,158 +95,25 @@ def export_engine():
     # ---------------------------------
     # Export controlnet.plan
     # ---------------------------------
-    controlnet_input_shape = dict(x_in = dict(min_shape = [1, 4, latent_height, latent_width],
-                                              opt_shape = [1, 4, latent_height, latent_width],
-                                              max_shape = [1, 4, latent_height, latent_width]),
-                                  h_in = dict(min_shape = [1, 3, image_height, image_width],
-                                              opt_shape = [1, 3, image_height, image_width],
-                                              max_shape = [1, 3, image_height, image_width]),
-                                  t_in = dict(min_shape = [1],
-                                              opt_shape = [1],
-                                              max_shape = [1]),
-                                  c_in = dict(min_shape = [1, 77, 768],
-                                              opt_shape = [1, 77, 768],
-                                              max_shape = [1, 77, 768]))
+    controlunet_input_shape = dict(x_in = dict(min_shape = [2, 4, latent_height, latent_width],
+                                              opt_shape = [2, 4, latent_height, latent_width],
+                                              max_shape = [2, 4, latent_height, latent_width]),
+                                  h_in = dict(min_shape = [2, 3, image_height, image_width],
+                                              opt_shape = [2, 3, image_height, image_width],
+                                              max_shape = [2, 3, image_height, image_width]),
+                                  t_in = dict(min_shape = [2],
+                                              opt_shape = [2],
+                                              max_shape = [2]),
+                                  c_in = dict(min_shape = [2, 77, 768],
+                                              opt_shape = [2, 77, 768],
+                                              max_shape = [2, 77, 768]))
     
-    from_onnx('./controlnet.onnx',
-              './controlnet.plan',
-              controlnet_input_shape,
-              1 << 32)
-    print("----- Export controlnet.plan : Done! -----")
-    
-    
-    
-    # ---------------------------------
-    # Export unet.plan
-    # ---------------------------------
-    
-    unet_input_shape = dict(x_in = dict(min_shape = [1, 4, latent_height, latent_width],
-                                        opt_shape = [1, 4, latent_height, latent_width],
-                                        max_shape = [1, 4, latent_height, latent_width]),
-                            t_in = dict(min_shape = [1],
-                                        opt_shape = [1],
-                                        max_shape = [1]),
-                            c_in = dict(min_shape = [1, 77, 768],
-                                        opt_shape = [1, 77, 768],
-                                        max_shape = [1, 77, 768]))
-    control_shape = []
-    control_shape.append([1, 320, 32, 48])
-    control_shape.append([1, 320, 32, 48])
-    control_shape.append([1, 320, 32, 48])
-    control_shape.append([1, 320, 16, 24])
-    control_shape.append([1, 640, 16, 24])
-    control_shape.append([1, 640, 16, 24])
-    control_shape.append([1, 640, 8, 12])
-    control_shape.append([1, 1280, 8, 12])
-    control_shape.append([1, 1280, 8, 12])
-    control_shape.append([1, 1280, 4, 6])
-    control_shape.append([1, 1280, 4, 6])
-    control_shape.append([1, 1280, 4, 6])
-    control_shape.append([1, 1280, 4, 6])
-    
-    for i in range(len(control_shape)):
-        unet_input_shape[f'control_{i}'] = dict(min_shape = control_shape[i],
-                                                opt_shape = control_shape[i],
-                                                max_shape = control_shape[i])
+    print("----- Export controlnet.plan : Done! -----")     
         
-        
-    # from_onnx('./unet.onnx',
-    #           './unet.plan',
-    #           unet_input_shape,
-    #           1 << 32)
-        
-        
-    export_unet_shell = 'trtexec --onnx=./unet.onnx --saveEngine=./unet.plan --fp16 --optShapes=x_in:1x4x32x48,t_in:1,c_in:1x77x768'
-    for i in range(len(control_shape)):
-        export_unet_shell += f',control_{i}:{control_shape[i][0]}x{control_shape[i][1]}x{control_shape[i][2]}x{control_shape[i][3]}'
-    
+    export_unet_shell = 'trtexec --onnx=./controlunet.onnx --saveEngine=./controlunet.plan --fp16 --optShapes=x_in:2x4x32x48,t_in:2,c_in:2x77x768,h_in:2x3x256x384'
     print(export_unet_shell)
     
     os.system(export_unet_shell)
-     
-     
-     
-     
-    # # ---------------------------------
-    # # Export unet_first_half.plan
-    # # ---------------------------------
-    # unet_fh_input_shape = dict(x_in = dict(min_shape = [1, 4, latent_height, latent_width],
-    #                                        opt_shape = [1, 4, latent_height, latent_width],
-    #                                        max_shape = [1, 4, latent_height, latent_width]),
-    #                            t_in = dict(min_shape = [1],
-    #                                        opt_shape = [1],
-    #                                        max_shape = [1]),
-    #                            c_in = dict(min_shape = [1, 77, 768],
-    #                                        opt_shape = [1, 77, 768],
-    #                                        max_shape = [1, 77, 768]))
- 
-    # from_onnx('./unet_first_half.onnx',
-    #           './unet_first_half.plan',
-    #           unet_fh_input_shape,
-    #           1 << 32)
-    
-    # print("--------- Export unet_first_half.plan : Done! ---------")
-    
-    # # ---------------------------------
-    # # Export unet_second_half.plan
-    # # ---------------------------------
-    
-    # control_shape = []
-    # control_shape.append([1, 320, 32, 48])
-    # control_shape.append([1, 320, 32, 48])
-    # control_shape.append([1, 320, 32, 48])
-    # control_shape.append([1, 320, 16, 24])
-    # control_shape.append([1, 640, 16, 24])
-    # control_shape.append([1, 640, 16, 24])
-    # control_shape.append([1, 640, 8, 12])
-    # control_shape.append([1, 1280, 8, 12])
-    # control_shape.append([1, 1280, 8, 12])
-    # control_shape.append([1, 1280, 4, 6])
-    # control_shape.append([1, 1280, 4, 6])
-    # control_shape.append([1, 1280, 4, 6])
-    # control_shape.append([1, 1280, 4, 6])
-    
-    # hs_shape = []
-    # hs_shape.append([1, 320, 32, 48])
-    # hs_shape.append([1, 320, 32, 48])
-    # hs_shape.append([1, 320, 32, 48])
-    # hs_shape.append([1, 320, 16, 24])
-    # hs_shape.append([1, 640, 16, 24])
-    # hs_shape.append([1, 640, 16, 24])
-    # hs_shape.append([1, 640, 8, 12])
-    # hs_shape.append([1, 1280, 8, 12])
-    # hs_shape.append([1, 1280, 8, 12])
-    # hs_shape.append([1, 1280, 4, 6])
-    # hs_shape.append([1, 1280, 4, 6])
-    # hs_shape.append([1, 1280, 4, 6])
-    
-    # unet_sh_input_shape = dict(h = dict(min_shape = [1, 1280, 4, 6],
-    #                                     opt_shape = [1, 1280, 4, 6],
-    #                                     max_shape = [1, 1280, 4, 6]))
-
-    # for i in range(len(hs_shape)):
-    #     unet_sh_input_shape[f'hs_{i}'] = dict(min_shape = hs_shape[i],
-    #                                           opt_shape = hs_shape[i],
-    #                                           max_shape = hs_shape[i])
-    # unet_sh_input_shape['emb'] = dict(min_shape = [1, 1280],
-    #                                   opt_shape = [1, 1280],
-    #                                   max_shape = [1, 1280])
-    # unet_sh_input_shape['c_in'] = dict(min_shape = [1, 77, 768],
-    #                                    opt_shape = [1, 77, 768],
-    #                                    max_shape = [1, 77, 768])
-    
-    # for i in range(len(control_shape)):
-    #     unet_sh_input_shape[f'control_{i}'] = dict(min_shape = control_shape[i],
-    #                                                opt_shape = control_shape[i],
-    #                                                max_shape = control_shape[i])
-        
-    
-    # # from_onnx('./unet_second_half.onnx',
-    # #           './unet_second_half.plan',
-    # #           unet_sh_input_shape,
-    # #           1 << 32)
-    # print("--------- Export unet_second_half.plan : Done! ---------")
-        
 
 if __name__ == "__main__":
     export_engine()

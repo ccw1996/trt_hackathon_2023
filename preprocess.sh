@@ -1,2 +1,2 @@
-python export_onnx.py
-python export_engine.py
+python3 export_onnx.py
+python3 export_engine.py

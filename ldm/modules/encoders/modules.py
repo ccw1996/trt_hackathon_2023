@@ -117,7 +117,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
     def forward(self, text, clip_context=None):
         batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
-        tokens = batch_encoding["input_ids"].to(self.device)
+        tokens = batch_encoding["input_ids"].type(torch.int32).to(self.device)
         if clip_context == None:
             outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")  # use clip
         else :

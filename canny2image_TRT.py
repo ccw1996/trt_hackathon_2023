@@ -51,66 +51,34 @@ class hackathon():
         self.model.control_context = None
         self.model.unet_context = None
         self.model.decoder_context = None
+        self.model.controlunet_context=None
         
     
         # -------------------------------
         # load clip engine
         # -------------------------------
             
-        # with open("./clip.plan", 'rb') as f:
-        #     engine_str = f.read()
-        #     clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-        #     clip_context = clip_engine.create_execution_context()
+        with open("./clip.plan", 'rb') as f:
+            engine_str = f.read()
+            clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+            clip_context = clip_engine.create_execution_context()
             
-        #     clip_context.set_binding_shape(0, (1, 77))
-        #     self.model.clip_context = clip_context
+            clip_context.set_binding_shape(0, (1, 77))
+            self.model.clip_context = clip_context
             
         # -------------------------------
         # load controlnet engine
         # -------------------------------
-        with open("./controlnet.plan", 'rb') as f:
+        with open("./controlunet.plan", 'rb') as f:
             engine_str = f.read()
-            control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-            control_context = control_engine.create_execution_context()
+            controlunet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+            controlunet_context = controlunet_engine.create_execution_context()
 
-            control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-            control_context.set_binding_shape(1, (1, 3, H, W))
-            control_context.set_binding_shape(2, (1,))
-            control_context.set_binding_shape(3, (1, 77, 768))
-            self.model.control_context = control_context
-        
-        # -------------------------------
-        # load unet engine
-        # -------------------------------
-        
-        with open("./unet.plan", 'rb') as f:
-            engine_str = f.read()
-            unet_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-            unet_context = unet_engine.create_execution_context()
-            
-            unet_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-            unet_context.set_binding_shape(1, (1,))
-            unet_context.set_binding_shape(2, (1, 77, 768))
-            
-            control_shape = []
-            control_shape.append([1, 320, 32, 48])
-            control_shape.append([1, 320, 32, 48])
-            control_shape.append([1, 320, 32, 48])
-            control_shape.append([1, 320, 16, 24])
-            control_shape.append([1, 640, 16, 24])
-            control_shape.append([1, 640, 16, 24])
-            control_shape.append([1, 640, 8, 12])
-            control_shape.append([1, 1280, 8, 12])
-            control_shape.append([1, 1280, 8, 12])
-            control_shape.append([1, 1280, 4, 6])
-            control_shape.append([1, 1280, 4, 6])
-            control_shape.append([1, 1280, 4, 6])
-            control_shape.append([1, 1280, 4, 6])
-            
-            for i in range(len(control_shape)):
-                unet_context.set_binding_shape(3 + i, tuple(control_shape[i]))
-            
-            self.model.unet_context = unet_context
+            controlunet_context.set_binding_shape(0, (2, 4, H // 8, W // 8))
+            controlunet_context.set_binding_shape(1, (2, 3, H, W))
+            controlunet_context.set_binding_shape(2, (2,))
+            controlunet_context.set_binding_shape(3, (2, 77, 768))
+            self.model.controlunet_context = controlunet_context
             
         # -------------------------------
         # load decoder engine
@@ -125,13 +93,9 @@ class hackathon():
             self.model.decoder_context = decoder_context
             
             
-            
-            
-            
 
     def process(self, input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, low_threshold, high_threshold):
         with torch.no_grad():
-            start = time.time_ns() // 1000 
             
             img = resize_image(HWC3(input_image), image_resolution)
             H, W, C = img.shape
@@ -150,45 +114,21 @@ class hackathon():
             if config.save_memory:
                 self.model.low_vram_shift(is_diffusing=False)
 
-            preprocess = time.time_ns() // 1000
-
-
-            # cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples, self.model.clip_context)]}
-            # un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples, self.model.clip_context)]}  # use clip net
-            cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples)]}
-            un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples)]}
+            cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples, self.model.clip_context)]}
+            un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples, self.model.clip_context)]}  # use clip net
             shape = (4, H // 8, W // 8)
-            
-            clip = time.time_ns() // 1000
-
-            if config.save_memory:
-                self.model.low_vram_shift(is_diffusing=True)
 
             self.model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
             samples, intermediates = self.ddim_sampler.sample(ddim_steps, num_samples,
                                                         shape, cond, verbose=False, eta=eta,
                                                         unconditional_guidance_scale=scale,
                                                         unconditional_conditioning=un_cond)
-            ctrlnet = time.time_ns() // 1000
-
-            if config.save_memory:
-                self.model.low_vram_shift(is_diffusing=False)
 
             x_samples = self.model.decode_first_stage(samples, decoder_context=self.model.decoder_context)
-            decode = time.time_ns() // 1000
             
             x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy().clip(0, 255).astype(np.uint8)
 
-            results = [x_samples[i] for i in range(num_samples)]
-            # end = time.time_ns() // 1000
-            # print("| Module      | Cost time|")
-            # print("|---          |---       |")
-            # print("| Preprocess  | {:8.3f} | \ ".format(1.0 * (preprocess - start) / 1000))
-            # print("| Clip        | {:8.3f} | \ ".format(1.0 * (clip - preprocess) / 1000))
-            # print("| Ctrl & Unet | {:8.3f} | \ ".format(1.0 * (ctrlnet - clip) / 1000))
-            # print("| Decode      | {:8.3f} | \ ".format(1.0 * (decode - ctrlnet) / 1000))
-            # print("| Postprocess | {:8.3f} | \ ".format(1.0 * (end - decode) / 1000))
-            # print("| Total       | {:8.3f} | \ ".format(1.0 * (end - start) / 1000))            
+            results = [x_samples[i] for i in range(num_samples)]           
             
         return results
     
