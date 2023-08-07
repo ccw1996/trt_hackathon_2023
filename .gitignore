@@ -11,6 +11,7 @@ out_imgs/**
 controlUnet_b2_onnx/
 controlUnet_onnx/
 engine_out_imgs/**
+torch_out_imgs/**
 
 *.plan
 *.pth
