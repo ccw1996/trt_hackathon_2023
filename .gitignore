@@ -16,6 +16,12 @@ controlUnet_onnx/
 *.ckpt
 *.safetensors
 
+*.weight
+*.bias
+*_Add_*
+*_MatMul_*
+*_Mul_*
+
 gradio_pose2image_private.py
 gradio_canny2image_private.py
 
