@@ -85,7 +85,7 @@ def export_engine():
     decoder_input_shape = dict(latent = dict(min_shape = [1, 4, latent_height, latent_width],
                                              opt_shape = [1, 4, latent_height, latent_width],
                                              max_shape = [1, 4, latent_height, latent_width]))
-    from_onnx('./vae_decoder.onnx',
+    from_onnx('./vae_decoder_optimize.onnx',
               './vae_decoder.plan',
               decoder_input_shape,
               1 << 32)
@@ -110,7 +110,7 @@ def export_engine():
     
     print("----- Export controlnet.plan : Done! -----")     
         
-    export_unet_shell = 'trtexec --onnx=./controlunet.onnx --saveEngine=./controlunet.plan --fp16 --optShapes=x_in:2x4x32x48,t_in:2,c_in:2x77x768,h_in:2x3x256x384'
+    export_unet_shell = 'trtexec --onnx=./controlunet_optimize.onnx --saveEngine=./controlunet.plan --fp16 --optShapes=x_in:2x4x32x48,t_in:2,c_in:2x77x768,h_in:2x3x256x384'
     print(export_unet_shell)
     
     os.system(export_unet_shell)
