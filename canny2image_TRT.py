@@ -95,8 +95,11 @@ class hackathon():
             
 
     def process(self, input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, low_threshold, high_threshold):
+        
+        ddim_steps = int(ddim_steps * 0.7)
+        
         with torch.no_grad():
-            
+            start = time.time_ns() // 1000 
             img = resize_image(HWC3(input_image), image_resolution)
             H, W, C = img.shape
 
@@ -111,21 +114,35 @@ class hackathon():
                 seed = random.randint(0, 65535)
             seed_everything(seed)
 
+            preprocess = time.time_ns() // 1000
+
             cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples, self.model.clip_context)]}
             un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples, self.model.clip_context)]}  # use clip net
             shape = (4, H // 8, W // 8)
+            clip = time.time_ns() // 1000
 
             self.model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
             samples, intermediates = self.ddim_sampler.sample(ddim_steps, num_samples,
                                                         shape, cond, verbose=False, eta=eta,
                                                         unconditional_guidance_scale=scale,
                                                         unconditional_conditioning=un_cond)
-
+            ctrlnet = time.time_ns() // 1000
             x_samples = self.model.decode_first_stage(samples, decoder_context=self.model.decoder_context)
-            
+            decode = time.time_ns() // 1000
             x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy().clip(0, 255).astype(np.uint8)
 
-            results = [x_samples[i] for i in range(num_samples)]           
+            results = [x_samples[i] for i in range(num_samples)]   
+            end = time.time_ns() // 1000
+            
+            # print("| Module      | Cost time|")
+            # print("|---          |---       |")
+            # print("| Preprocess  | {:8.3f} | \ ".format(1.0 * (preprocess - start) / 1000))
+            # print("| Clip        | {:8.3f} | \ ".format(1.0 * (clip - preprocess) / 1000))
+            # print("| Ctrl & Unet | {:8.3f} | \ ".format(1.0 * (ctrlnet - clip) / 1000))
+            # print("| Decode      | {:8.3f} | \ ".format(1.0 * (decode - ctrlnet) / 1000))
+            # print("| Postprocess | {:8.3f} | \ ".format(1.0 * (end - decode) / 1000))
+            # print("| Total       | {:8.3f} | \ ".format(1.0 * (end - start) / 1000))  
+                    
             
         return results
     

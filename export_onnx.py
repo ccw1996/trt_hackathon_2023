@@ -37,7 +37,7 @@ def export_hackathon_onnx(model):
     print("------------ Export Clip ------------")    
     clip_model = model.cond_stage_model.transformer
     batch_size = 1
-    inputs_clip=torch.zeros(batch_size, 77, dtype=torch.int32, device="cuda:0")
+    inputs_clip = torch.zeros(batch_size, 77, dtype=torch.int32, device="cuda:0")
     
     export_onnx(model=clip_model,
                 input=inputs_clip,
@@ -75,9 +75,9 @@ def export_hackathon_onnx(model):
     # ------------------------------
     print("--------- Export unet with controlnet ---------")    
 
-    model.forward=model.fusion_forward
+    model.forward = model.fusion_forward
     #check validation
-    controlunet_model=model
+    controlunet_model = model
     x_in = torch.randn(2, 4, latent_height, latent_width, dtype=torch.float32, device='cuda:0')
     h_in = torch.randn(2, 3, image_height, image_width, dtype=torch.float32, device='cuda:0')
     t_in = torch.zeros(2, dtype=torch.int32, device='cuda:0')
