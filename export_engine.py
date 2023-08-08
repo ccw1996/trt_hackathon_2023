@@ -75,7 +75,7 @@ def export_engine():
     from_onnx('./clip_optimize.onnx',
               './clip.plan',
               clip_input_shape,
-              1 << 32,fp16_mode=False
+              1 << 32
               )
     print("-------- Export clip.plan : Done! --------")
     
