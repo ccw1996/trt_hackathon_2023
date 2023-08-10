@@ -145,8 +145,8 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         #     z = outputs.hidden_states[self.layer_idx]
         # return z
 
-    def encode(self, text, clip_context=None):
-        return self(text, clip_context)
+    def encode(self, text1,text2,clip_context=None):
+        return self(text1,text2, clip_context)
 
 
 class FrozenOpenCLIPEmbedder(AbstractEncoder):
