@@ -63,7 +63,7 @@ class hackathon():
             clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
             clip_context = clip_engine.create_execution_context()
             
-            clip_context.set_binding_shape(0, (1, 77))
+            clip_context.set_binding_shape(0, (2, 77))
             self.model.clip_context = clip_context
             
         # -------------------------------
@@ -115,9 +115,12 @@ class hackathon():
             seed_everything(seed)
 
             preprocess = time.time_ns() // 1000
-
-            cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples, self.model.clip_context)]}
-            un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples, self.model.clip_context)]}  # use clip net
+            result_clip=self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples, [n_prompt] * num_samples, self.model.clip_context)
+            result_clip1=result_clip[0]
+            result_clip2=result_clip[1]
+            
+            cond = {"c_concat": [control], "c_crossattn": [result_clip1]}
+            un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [result_clip2]}  # use clip net
             shape = (4, H // 8, W // 8)
             clip = time.time_ns() // 1000
 

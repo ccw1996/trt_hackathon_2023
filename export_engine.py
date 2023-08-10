@@ -82,9 +82,9 @@ def export_engine():
     # ---------------------------------
     # Export vae_decoder.plan
     # ---------------------------------
-    decoder_input_shape = dict(latent = dict(min_shape = [1, 4, latent_height, latent_width],
-                                             opt_shape = [1, 4, latent_height, latent_width],
-                                             max_shape = [1, 4, latent_height, latent_width]))
+    decoder_input_shape = dict(latent = dict(min_shape = [2, 4, latent_height, latent_width],
+                                             opt_shape = [2, 4, latent_height, latent_width],
+                                             max_shape = [2, 4, latent_height, latent_width]))
     from_onnx('./vae_decoder_optimize.onnx',
               './vae_decoder.plan',
               decoder_input_shape,

@@ -114,16 +114,21 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         for param in self.parameters():
             param.requires_grad = False
 
-    def forward(self, text, clip_context=None):
-        batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
+    def forward(self, text1,text2, clip_context=None):
+        batch_encoding = self.tokenizer(text1, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
-        tokens = batch_encoding["input_ids"].type(torch.int32).to(self.device)
+        tokens1 = batch_encoding["input_ids"].type(torch.int32).to(self.device)
+        batch_encoding2 = self.tokenizer(text2, truncation=True, max_length=self.max_length, return_length=True,
+                                        return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
+        tokens2 = batch_encoding2["input_ids"].type(torch.int32).to(self.device)
+        tokens=torch.cat([tokens1,tokens2],dim=0)
         if clip_context == None:
-            outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")  # use clip
+            pass
+            #outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")  # use clip
         else :
             # FIXME dynamicIMG
-            text_emb = torch.zeros(1, 77, 768, dtype=torch.float32).to("cuda")
-            other_out = torch.zeros(1, 768, dtype=torch.float32).to("cuda")
+            text_emb = torch.zeros(2, 77, 768, dtype=torch.float32).to("cuda")
+            other_out = torch.zeros(2, 768, dtype=torch.float32).to("cuda")
             clip_buffer = []
             clip_buffer.append(tokens.reshape(-1).data_ptr())
             clip_buffer.append(text_emb.reshape(-1).data_ptr())
@@ -132,13 +137,13 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             
             return text_emb
 
-        if self.layer == "last": 
-            z = outputs.last_hidden_state  # this
-        elif self.layer == "pooled":
-            z = outputs.pooler_output[:, None, :]
-        else:
-            z = outputs.hidden_states[self.layer_idx]
-        return z
+        # if self.layer == "last": 
+        #     z = outputs.last_hidden_state  # this
+        # elif self.layer == "pooled":
+        #     z = outputs.pooler_output[:, None, :]
+        # else:
+        #     z = outputs.hidden_states[self.layer_idx]
+        # return z
 
     def encode(self, text, clip_context=None):
         return self(text, clip_context)

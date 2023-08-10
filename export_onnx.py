@@ -36,7 +36,7 @@ def export_hackathon_onnx(model):
     # Clip has two output
     print("------------ Export Clip ------------")    
     clip_model = model.cond_stage_model.transformer
-    batch_size = 1
+    batch_size = 2
     inputs_clip = torch.zeros(batch_size, 77, dtype=torch.int32, device="cuda:0")
     
     export_onnx(model=clip_model,
@@ -44,8 +44,8 @@ def export_hackathon_onnx(model):
                 file='./clip.onnx',
                 input_names=['input_ids'],
                 output_names=['text_embeddings', 'pooler_output'],
-                dynamic_axes={'input_ids': {0: 'B'}, 
-                               'text_embeddings': {0: 'B'}}
+                dynamic_axes={'input_ids': {0: '2B'}, 
+                               'text_embeddings': {0: '2B'}}
                 )
 
     # ------------------------------
