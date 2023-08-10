@@ -75,7 +75,7 @@ def export_engine():
     from_onnx('./clip_optimize.onnx',
               './clip.plan',
               clip_input_shape,
-              1 << 32
+              1 << 32,fp16_mode=False
               )
     print("-------- Export clip.plan : Done! --------")
     
@@ -88,7 +88,7 @@ def export_engine():
     from_onnx('./vae_decoder_optimize.onnx',
               './vae_decoder.plan',
               decoder_input_shape,
-              1 << 32)
+              1 << 32,fp16_mode=False)
     print("----- Export vae_decoder.plan : Done! ----")
     
     
@@ -110,7 +110,7 @@ def export_engine():
     
     print("----- Export controlnet.plan : Done! -----")     
         
-    export_unet_shell = 'trtexec --onnx=./controlunet_optimize.onnx --saveEngine=./controlunet.plan --useCudaGraph --fp16 --optShapes=x_in:2x4x32x48,t_in:2,c_in:2x77x768,h_in:2x3x256x384'
+    export_unet_shell = 'trtexec --onnx=./controlunet_optimize.onnx --saveEngine=./controlunet.plan --useCudaGraph --fp16 --builderoptimizationlevel=4 --optShapes=x_in:2x4x32x48,t_in:2,c_in:2x77x768,h_in:2x3x256x384'
     print(export_unet_shell)
     
     os.system(export_unet_shell)
