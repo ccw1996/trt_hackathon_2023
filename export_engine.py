@@ -88,7 +88,7 @@ def export_engine():
     from_onnx('./vae_decoder_optimize.onnx',
               './vae_decoder.plan',
               decoder_input_shape,
-              1 << 32,fp16_mode=False)
+              1 << 32)
     print("----- Export vae_decoder.plan : Done! ----")
     
     
