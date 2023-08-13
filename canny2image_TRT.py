@@ -95,7 +95,7 @@ class hackathon():
 
     def process(self, input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, low_threshold, high_threshold):
         
-        ddim_steps = int(ddim_steps * 0.4)
+        ddim_steps = int(ddim_steps * 0.7)
         
         with torch.no_grad():
             start = time.time_ns() // 1000 
