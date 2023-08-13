@@ -110,7 +110,7 @@ def export_engine():
     
     print("----- Export controlnet.plan : Done! -----")     
         
-    export_unet_shell = 'trtexec --onnx=./controlunet_optimize.onnx --saveEngine=./controlunet.plan --useCudaGraph --best --builderOptimizationLevel=4 --optShapes=x_in:2x4x32x48,t_in:2,c_in:2x77x768,h_in:2x3x256x384'
+    export_unet_shell = 'trtexec --onnx=./controlunet_optimize.onnx --saveEngine=./controlunet.plan --useCudaGraph --fp16 --builderOptimizationLevel=4 --optShapes=x_in:2x4x32x48,t_in:2,c_in:2x77x768,h_in:2x3x256x384'
     print(export_unet_shell)
     
     os.system(export_unet_shell)
